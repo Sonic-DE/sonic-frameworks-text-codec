@@ -179,8 +179,6 @@ void KEncodingProberTest::testProbe()
     QEXPECT_FAIL("Plasma Ukrainian UTF-16BE", "UTF-16 low confidence", Abort);
     QCOMPARE(ep.encoding().toLower(), encoding);
 
-    QEXPECT_FAIL("EnjoyPlasma Japanese UTF-16LE", "UTF-16 zero confidence", Abort);
-    QEXPECT_FAIL("EnjoyPlasma Japanese UTF-16BE", "UTF-16 zero confidence", Abort);
     QCOMPARE_GE(ep.confidence(), 0.2);
 }
 
@@ -237,6 +235,15 @@ void KEncodingProberTest::testProbe_data()
     QTest::addRow("eucjp Universal") // "フリー百科事典" - "Free encyclopedia" (from Wikipedia start page)
         << QByteArray::fromHex("a5d5a5eaa1bcc9b4b2cabbf6c5b5") //
         << KEncodingProber::Universal << QByteArray("euc-jp");
+
+    // "위키백과는 우리 모두가 함께 만들어 가는 자유로운 백과사전입니다. 한국어 문서를 읽고 누구나 편집할 수 있습니다. "
+    // "Wikipedia is a free encyclopedia we all build together. Anyone can read and edit Korean articles. "
+    const auto koreanEucKr = QByteArray::fromHex(
+        "c0a7c5b0b9e9b0fab4c220bfecb8ae20b8f0b5ceb0a120c7d4b2b220b8b8b5e9beee20b0a1b4c220"
+        "c0dac0afb7cebfee20b9e9b0fabbe7c0fcc0d4b4cfb4d92e20c7d1b1b9beee20b9aebcadb8a620"
+        "c0d0b0ed20b4a9b1b8b3aa20c6edc1fdc7d220bcf620c0d6bdc0b4cfb4d92e20");
+    QTest::addRow("euc-kr Korean") << koreanEucKr << KEncodingProber::Korean << QByteArray("euc-kr");
+    QTest::addRow("euc-kr Universal") << koreanEucKr << KEncodingProber::Universal << QByteArray("euc-kr");
 
     QTest::addRow("iso-2022-jp") // "フリー百科事典" - "Free encyclopedia" (from Wikipedia start page)
         << "\x1b$B%U%j!<I42J;vE5\x1b(B"_ba //
