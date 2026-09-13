@@ -112,6 +112,7 @@ public:
     }
 
     nsProbingState ProcessInput(const char *aBuf, unsigned int aLen);
+    nsProbingState GetState() const;
     const char *GetCharSetName();
     float GetConfidence(void);
 
@@ -143,8 +144,8 @@ nsProbingState nsUniversalDetector::HandleData(const char *aBuf, unsigned int aL
 
 nsProbingState ProberState::ProcessInput(const char *aBuf, unsigned int aLen)
 {
-    if (mDone) {
-        return eFoundIt;
+    if (const auto state = GetState(); state != eDetecting) {
+        return state;
     }
 
     if (aLen == 0) {
@@ -199,6 +200,24 @@ nsProbingState ProberState::ProcessInput(const char *aBuf, unsigned int aLen)
         }
     }
 
+    return GetState();
+}
+
+nsProbingState ProberState::GetState() const
+{
+    if (mDone) {
+        return eFoundIt;
+    }
+    // Before seeing a high byte, selected 8-bit probers are still dormant,
+    // not rejected. Once activated, an inactive prober cannot accept more data.
+    if (mHas8Bit) {
+        for (const auto &state : mStates) {
+            if (state.selected && state.active) {
+                return eDetecting;
+            }
+        }
+        return eNotMe;
+    }
     return eDetecting;
 }
 
@@ -210,6 +229,9 @@ const char *nsUniversalDetector::GetCharSetName()
 
 const char *ProberState::GetCharSetName()
 {
+    if (GetState() == eNotMe) {
+        return "";
+    }
     if (mDetectedCharset) {
         return mDetectedCharset;
     } else if (!mHas8Bit) {
@@ -230,7 +252,7 @@ const char *ProberState::GetCharSetName()
     // do not report anything because we are not confident of it, that's in fact a negative answer
     if (maxProberConfidence > MINIMUM_THRESHOLD) {
         return bestCharSet;
-    } else if (mStates[0].prober && mStates[0].prober->GetState() != eNotMe) {
+    } else if (mStates[0].active) {
         // Default to UTF-8, but only if valid
         return mStates[0].prober->GetCharSetName();
     }
@@ -245,6 +267,9 @@ float nsUniversalDetector::GetConfidence()
 
 float ProberState::GetConfidence()
 {
+    if (GetState() == eNotMe) {
+        return 0.0f;
+    }
     if (!mGotData) {
         // we haven't got any data yet, return immediately
         // caller program sometimes call DataEnd before anything has been sent to detector
@@ -274,11 +299,7 @@ float ProberState::GetConfidence()
 
 nsProbingState nsUniversalDetector::GetState()
 {
-    if (mProberState->mDone) {
-        return eFoundIt;
-    } else {
-        return eDetecting;
-    }
+    return mProberState->GetState();
 }
 
 std::string nsUniversalDetector::StatusOutput(uint8_t indent)

@@ -8,6 +8,8 @@
 #include <QTest>
 #include <kencodingprober.h>
 
+#include <algorithm>
+
 namespace
 {
 template<size_t M>
@@ -41,6 +43,8 @@ class KEncodingProberTest : public QObject
     Q_OBJECT
 private Q_SLOTS:
     void testReset();
+    void testUnicodeRejection();
+    void testUnicodeRejection_data();
     void testShort();
     void testShort_data();
     void testProbe();
@@ -78,6 +82,47 @@ void KEncodingProberTest::testReset()
 
     QCOMPARE(ep.state(), KEncodingProber::Probing);
     QCOMPARE(ep.encoding().toLower(), encoding);
+}
+
+void KEncodingProberTest::testUnicodeRejection()
+{
+    using namespace Qt::StringLiterals;
+
+    QFETCH(int, chunkSize);
+
+    KEncodingProber ep(KEncodingProber::Unicode);
+    QCOMPARE(ep.state(), KEncodingProber::Probing);
+
+    const QByteArray invalid(16, '\xff');
+    for (qsizetype offset = 0; offset < invalid.size(); offset += chunkSize) {
+        ep.feed(QByteArrayView(invalid).sliced(offset, std::min<qsizetype>(chunkSize, invalid.size() - offset)));
+    }
+
+    QCOMPARE(ep.state(), KEncodingProber::NotMe);
+    QCOMPARE(ep.confidence(), 0.0f);
+    QVERIFY(ep.encoding().isEmpty());
+    QCOMPARE(ep.feed("Hello world"_ba), KEncodingProber::NotMe);
+    QCOMPARE(ep.confidence(), 0.0f);
+
+    ep.reset();
+    QCOMPARE(ep.state(), KEncodingProber::Probing);
+    QCOMPARE(ep.feed("Hello world"_ba), KEncodingProber::Probing);
+    QCOMPARE(ep.encoding(), "UTF-8"_ba);
+    QCOMPARE_GE(ep.confidence(), 0.2f);
+
+    ep.setProberType(KEncodingProber::Universal);
+    QCOMPARE_NE(ep.feed(invalid), KEncodingProber::NotMe);
+    QCOMPARE(ep.encoding().toLower(), "windows-1252"_ba);
+}
+
+void KEncodingProberTest::testUnicodeRejection_data()
+{
+    QTest::addColumn<int>("chunkSize");
+
+    QTest::addRow("single-buffer") << 16;
+    QTest::addRow("one-byte-chunks") << 1;
+    QTest::addRow("two-byte-chunks") << 2;
+    QTest::addRow("three-byte-chunks") << 3;
 }
 
 void KEncodingProberTest::testShort()
@@ -135,15 +180,9 @@ void KEncodingProberTest::testProbe()
     QEXPECT_FAIL("Plasma Ukrainian UTF-16BE", "UTF-16 low confidence", Abort);
     QCOMPARE(ep.encoding().toLower(), encoding);
 
-    QEXPECT_FAIL("UTF-16BE Unicode", "UTF-16 no confidence", Abort);
-    QEXPECT_FAIL("UTF-16BE Unicode definite 1", "UTF-16 zero confidence", Abort);
-    QEXPECT_FAIL("UTF-16LE Unicode definite 1", "UTF-16 zero confidence", Abort);
-    QEXPECT_FAIL("UTF-16BE Unicode definite 2", "UTF-16 zero confidence", Abort);
-    QEXPECT_FAIL("UTF-16LE Unicode definite 2", "UTF-16 zero confidence", Abort);
     QEXPECT_FAIL("utf-8 Japanese", "Too low UTF-8 confidence", Abort);
     QEXPECT_FAIL("EnjoyPlasma Japanese UTF-16LE", "UTF-16 zero confidence", Abort);
     QEXPECT_FAIL("EnjoyPlasma Japanese UTF-16BE", "UTF-16 zero confidence", Abort);
-    QEXPECT_FAIL("Konnichiwa UTF-8 Unicode", "Too low UTF-8 confidence", Abort);
     QEXPECT_FAIL("Konnichiwa UTF-8 Japanese", "Too low UTF-8 confidence", Abort);
     QCOMPARE_GE(ep.confidence(), 0.2);
 }
