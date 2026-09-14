@@ -49,6 +49,8 @@ private Q_SLOTS:
     void testShort_data();
     void testProbe();
     void testProbe_data();
+    void testUtf16Statistics();
+    void testUtf16Statistics_data();
 
     void benchmarkProber();
     void benchmarkProber_data();
@@ -163,16 +165,6 @@ void KEncodingProberTest::testProbe()
         return;
     }
 
-    QEXPECT_FAIL("UTF-16LE Unicode", "UTF-16BE preferred unless erroneous", Abort);
-    QEXPECT_FAIL("utf-16le Simplified Chinese", "UTF-16BE preferred unless erroneous", Abort);
-    QEXPECT_FAIL("utf-8 Hebrew", "UTF-8 zero confidence", Abort);
-    QEXPECT_FAIL("Konnichiwa UTF-16LE", "UTF-16BE preferred unless erroneous", Abort);
-    QEXPECT_FAIL("ASCII codepoints UTF-16LE", "UTF-16 low confidence", Abort);
-    QEXPECT_FAIL("ASCII codepoints UTF-16LE Universal", "UTF-16 with values <= 0x7f not checked", Abort);
-    QEXPECT_FAIL("ASCII codepoints UTF-16BE", "UTF-16 low confidence", Abort);
-    QEXPECT_FAIL("ASCII codepoints UTF-16BE Universal", "UTF-16 with values <= 0x7f not checked", Abort);
-    QEXPECT_FAIL("Plasma Ukrainian UTF-16LE", "UTF-16 low confidence", Abort);
-    QEXPECT_FAIL("Plasma Ukrainian UTF-16BE", "UTF-16 low confidence", Abort);
     QCOMPARE(ep.encoding().toLower(), encoding);
 
     QCOMPARE_GE(ep.confidence(), 0.2);
@@ -185,6 +177,11 @@ void KEncodingProberTest::testProbe_data()
     QTest::addColumn<QByteArray>("data");
     QTest::addColumn<KEncodingProber::ProberType>("proberType");
     QTest::addColumn<QByteArray>("encoding");
+
+    for (const auto *ascii : {"hello", "1234567890", "abababababababab", "Read me."}) {
+        QTest::addRow("ASCII Universal %s", ascii) << QByteArray(ascii) << KEncodingProber::Universal << QByteArray("utf-8");
+        QTest::addRow("ASCII Unicode %s", ascii) << QByteArray(ascii) << KEncodingProber::Unicode << QByteArray("utf-8");
+    }
 
     QTest::addRow("utf-8 Simplified Chinese") // "阿尔卑斯山脉" - "The Alps"
         << QByteArray::fromHex("e998bfe5b094e58d91e696afe5b1b1e88489") //
@@ -458,6 +455,49 @@ void KEncodingProberTest::testProbe_data()
     QTest::addRow("Plasma ZH-CN UTF-16BE") //
         << QByteArray(asU16BEArray(plasmaZH_CNText)) //
         << KEncodingProber::Universal << QByteArray("utf-16be");
+}
+
+void KEncodingProberTest::testUtf16Statistics()
+{
+    QFETCH(int, byteCount);
+    QFETCH(bool, bigEndian);
+    QFETCH(KEncodingProber::ProberType, proberType);
+    QFETCH(int, chunkSize);
+
+    const auto seed = bigEndian ? QByteArray(asU16BEArray(u"Café crème. À bientôt. ")) : QByteArray(asU16LEArray(u"Café crème. À bientôt. "));
+    auto data = seed.repeated((byteCount + seed.size() - 1) / seed.size());
+    data.truncate(byteCount);
+
+    KEncodingProber ep(proberType);
+    if (chunkSize == 0) {
+        ep.feed(data);
+    } else {
+        for (qsizetype offset = 0; offset < data.size(); offset += chunkSize) {
+            ep.feed(QByteArrayView(data).sliced(offset, std::min<qsizetype>(chunkSize, data.size() - offset)));
+        }
+    }
+    QCOMPARE(ep.encoding(), QByteArray(bigEndian ? "UTF-16BE" : "UTF-16LE"));
+    QCOMPARE_GE(ep.confidence(), 0.9f);
+}
+
+void KEncodingProberTest::testUtf16Statistics_data()
+{
+    QTest::addColumn<int>("byteCount");
+    QTest::addColumn<bool>("bigEndian");
+    QTest::addColumn<KEncodingProber::ProberType>("proberType");
+    QTest::addColumn<int>("chunkSize");
+
+    // At 256 KiB, a single histogram bin can reach 65536 and overflow a 32-bit square.
+    for (int byteCount : {262140, 262144, 262148}) {
+        for (bool bigEndian : {false, true}) {
+            for (auto proberType : {KEncodingProber::Universal, KEncodingProber::Unicode}) {
+                for (int chunkSize : {0, 4095}) {
+                    QTest::addRow("%s-%s-%d-chunk%d", bigEndian ? "BE" : "LE", proberType == KEncodingProber::Universal ? "Universal" : "Unicode", byteCount, chunkSize)
+                        << byteCount << bigEndian << proberType << chunkSize;
+                }
+            }
+        }
+    }
 }
 
 void KEncodingProberTest::benchmarkProber()
