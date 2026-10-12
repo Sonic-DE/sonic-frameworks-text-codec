@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.29)
+cmake_minimum_required(VERSION 3.30)
 
 set(KF_VERSION "6.30.0") # handled by release scripts
 project(KCodecs VERSION ${KF_VERSION})
@@ -20,7 +20,7 @@ include(KDEGitCommitHooks)
 include(ECMQtDeclareLoggingCategory)
 include(ECMDeprecationSettings)
 
-set(REQUIRED_QT_VERSION 6.9.0)
+set(REQUIRED_QT_VERSION 6.10.0)
 find_package(Qt6Core ${REQUIRED_QT_VERSION} REQUIRED NO_MODULE)
 
 include(ECMGenerateExportHeader)
@@ -28,6 +28,7 @@ include(CMakePackageConfigHelpers)
 include(ECMSetupVersion)
 include(ECMGenerateHeaders)
 include(ECMGenerateQDoc)
+include(ECMInstalledLibraryCheck)
 
 include(ECMPoQmTools)
 

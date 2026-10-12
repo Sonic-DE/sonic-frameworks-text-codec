@@ -114,32 +114,12 @@ void KEncodingProberTest::testProbe()
     KEncodingProber ep(proberType);
     QCOMPARE(ep.proberType(), proberType);
     ep.feed(data);
+    if (encoding.isNull()) {
+        return;
+    }
 
-    QEXPECT_FAIL("UTF-16LE Unicode", "UTF-16BE preferred unless erroneous", Abort);
-    QEXPECT_FAIL("utf-8 Hebrew", "UTF-8 zero confidence", Abort);
-    QEXPECT_FAIL("windows-1252 Latin1 short", "Defaulting to invalid UTF-8", Continue);
-    QEXPECT_FAIL("iso-2022-jp", "ISO-2022 not included in Japanese prober set", Abort);
-    QEXPECT_FAIL("utf-8 Japanese Universal", "Too low UTF-8 confidence, too high Win-1252", Abort);
-    QEXPECT_FAIL("Konnichiwa UTF-16LE", "Too low UTF-16LE confidence, too high Win-1252", Abort);
-    QEXPECT_FAIL("Konnichiwa UTF-16BE", "Too low UTF-16BE confidence, too high Win-1252", Abort);
-    QEXPECT_FAIL("EnjoyPlasma Japanese UTF-16LE Universal", "Too low UTF-16LE confidence, too high Win-1252", Abort);
-    QEXPECT_FAIL("EnjoyPlasma Japanese UTF-16BE Universal", "Too low UTF-16BE confidence, too high Win-1252", Abort);
-    QEXPECT_FAIL("ASCII codepoints UTF-16LE", "UTF-16 low confidence", Abort);
-    QEXPECT_FAIL("ASCII codepoints UTF-16LE Universal", "UTF-16 with values <= 0x7f not checked", Abort);
-    QEXPECT_FAIL("ASCII codepoints UTF-16BE", "UTF-16 low confidence", Abort);
-    QEXPECT_FAIL("ASCII codepoints UTF-16BE Universal", "UTF-16 with values <= 0x7f not checked", Abort);
-    QEXPECT_FAIL("Plasma Ukrainian UTF-16LE", "UTF-16 low confidence", Abort);
-    QEXPECT_FAIL("Plasma Ukrainian UTF-16BE", "UTF-16 low confidence", Abort);
     QCOMPARE(ep.encoding().toLower(), encoding);
 
-    QEXPECT_FAIL("UTF-16BE Unicode", "UTF-16 no confidence", Abort);
-    QEXPECT_FAIL("UTF-16BE Unicode definite 1", "UTF-16 zero confidence", Abort);
-    QEXPECT_FAIL("UTF-16LE Unicode definite 1", "UTF-16 zero confidence", Abort);
-    QEXPECT_FAIL("UTF-16BE Unicode definite 2", "UTF-16 zero confidence", Abort);
-    QEXPECT_FAIL("UTF-16LE Unicode definite 2", "UTF-16 zero confidence", Abort);
-    QEXPECT_FAIL("utf-8 Japanese", "Too low UTF-8 confidence", Abort);
-    QEXPECT_FAIL("EnjoyPlasma Japanese UTF-16LE", "UTF-16 zero confidence", Abort);
-    QEXPECT_FAIL("EnjoyPlasma Japanese UTF-16BE", "UTF-16 zero confidence", Abort);
     QCOMPARE_GE(ep.confidence(), 0.2);
 }
 
@@ -154,6 +134,12 @@ void KEncodingProberTest::testProbe_data()
     QTest::addRow("utf-8 Simplified Chinese") // "阿尔卑斯山脉" - "The Alps"
         << QByteArray::fromHex("e998bfe5b094e58d91e696afe5b1b1e88489") //
         << KEncodingProber::Universal << QByteArray("utf-8");
+    QTest::addRow("utf-16be Simplified Chinese") // "阿尔卑斯山脉" - "The Alps"
+        << QByteArray(asU16BEArray(u"阿尔卑斯山脉")) //
+        << KEncodingProber::Universal << QByteArray("utf-16be");
+    QTest::addRow("utf-16le Simplified Chinese") // "阿尔卑斯山脉" - "The Alps"
+        << QByteArray(asU16LEArray(u"阿尔卑斯山脉")) //
+        << KEncodingProber::Universal << QByteArray("utf-16le");
 
     QTest::addRow("windows-1252 Latin1 short") //
         << "Latin1 Text h\xE4lt h\xF6rt f\xFChrt lie\xDF"_ba // "Latin1 Text hält hört führt ließ"
@@ -161,6 +147,19 @@ void KEncodingProberTest::testProbe_data()
 
     QTest::addRow("windows-1252 German") //
         << "Victor jagt zw\xf6lf Boxk\xe4mpfer quer \xfc\x62\x65r den gro\xdf\x65n Sylter Deich."_ba //
+        << KEncodingProber::Universal << QByteArray("windows-1252");
+
+    QTest::addRow("windows-1252 German WesternEuropean") //
+        << "Victor jagt zw\xf6lf Boxk\xe4mpfer quer \xfc\x62\x65r den gro\xdf\x65n Sylter Deich."_ba //
+        << KEncodingProber::WesternEuropean << QByteArray("windows-1252");
+
+    QTest::addRow("Windows-1252 French") //
+        << "L'ergoth\xe9rapeute effectue des prestations de r\xe9\xe9\x64ucation et de r\xe9\x61\x64\x61ptation."_ba //
+        << KEncodingProber::Universal << QByteArray("windows-1252");
+
+    QTest::addRow("Windows-1252 Spanish") //
+        << "La socioling\xfc\xedstica sincr\xf3nica se centra en la estructura socioling\xfc\xedstica " //
+           "y en las variaciones ling\xfc\xedsticas."_ba //
         << KEncodingProber::Universal << QByteArray("windows-1252");
 
     QTest::addRow("utf-8 Latin1 Supplement") //
@@ -175,6 +174,10 @@ void KEncodingProberTest::testProbe_data()
         << QByteArray::fromHex("d7d4d3c9b5c4b0d9bfc6c8abcae9") //
         << KEncodingProber::ChineseSimplified << QByteArray("gb18030");
 
+    QTest::addRow("gb18030 Universal") // "自由的百科全书" - "The free encyclopedia" (from Wikipedia start page)
+        << QByteArray::fromHex("d7d4d3c9b5c4b0d9bfc6c8abcae9") //
+        << KEncodingProber::Universal << QByteArray("gb18030");
+
     QTest::addRow("shift_jis") // "フリー百科事典" - "Free encyclopedia" (from Wikipedia start page)
         << QByteArray::fromHex("8374838a815b955389c88e969354") //
         << KEncodingProber::Japanese << QByteArray("shift_jis");
@@ -182,6 +185,10 @@ void KEncodingProberTest::testProbe_data()
     QTest::addRow("eucjp") // "フリー百科事典" - "Free encyclopedia" (from Wikipedia start page)
         << QByteArray::fromHex("a5d5a5eaa1bcc9b4b2cabbf6c5b5") //
         << KEncodingProber::Japanese << QByteArray("euc-jp");
+
+    QTest::addRow("eucjp Universal") // "フリー百科事典" - "Free encyclopedia" (from Wikipedia start page)
+        << QByteArray::fromHex("a5d5a5eaa1bcc9b4b2cabbf6c5b5") //
+        << KEncodingProber::Universal << QByteArray("euc-jp");
 
     QTest::addRow("iso-2022-jp") // "フリー百科事典" - "Free encyclopedia" (from Wikipedia start page)
         << "\x1b$B%U%j!<I42J;vE5\x1b(B"_ba //
@@ -202,6 +209,10 @@ void KEncodingProberTest::testProbe_data()
     QTest::addRow("big5") //
         << QByteArray::fromHex("aefcafc7a6caa474a141a6b3ae65a444a46a") //
         << KEncodingProber::ChineseTraditional << QByteArray("big5");
+
+    QTest::addRow("Big5 HKSCS Cantonese") // "維基百科係正嘢嚟㗎" - "Wikipedia is awesome"
+        << QByteArray::fromHex("bafbb0f2a6caacecab59a5bf9dcf91c19dee") //
+        << KEncodingProber::Universal << QByteArray("big5");
 
     // "שפן אכל קצת גזר בטעם חסה, ודי" - "A bunny ate some lettuce-flavored carrots, and he had enough"
     QTest::addRow("windows-1255 Hebrew") //
@@ -237,7 +248,7 @@ void KEncodingProberTest::testProbe_data()
         "Y2sgQXVkaW9DRIEHK4JhWg0OvPK2SjYuwNZv1ogI/xOICf8TgxUZjO5WiREAnBJIZWxsbyB2MC41"
         "MGGIE1DD");
     QTest::addRow("binaryData") //
-        << binaryData << KEncodingProber::Universal << QByteArray("utf-8");
+        << binaryData << KEncodingProber::Universal << QByteArray();
 
     QTest::addRow("BOM UTF-8") //
         << QByteArray("\xef\xbb\xbfZ", 4) // "<UTF-8 BOM>Z"
@@ -280,6 +291,18 @@ void KEncodingProberTest::testProbe_data()
     QTest::addRow("Konnichiwa ISO-2022-JP") //
         << QByteArray("\x1b$B$3$s$K$A$O\x1b(B") //
         << KEncodingProber::Universal << QByteArray("iso-2022-jp");
+    QTest::addRow("Konnichiwa UTF-8 Unicode") //
+        << QStringLiteral(u"こんにちは").toUtf8() //
+        << KEncodingProber::Unicode << QByteArray("utf-8");
+    QTest::addRow("Konnichiwa UTF-8 Japanese") //
+        << QStringLiteral(u"こんにちは").toUtf8() //
+        << KEncodingProber::Japanese << QByteArray("utf-8");
+    QTest::addRow("Konnichiwa Shift-JIS") //
+        << QByteArray::fromHex("82b1 82f1 82c9 82bf 82cd") //
+        << KEncodingProber::Universal << QByteArray("shift_jis");
+    QTest::addRow("Konnichiwa EUC-JP") //
+        << QByteArray::fromHex("a4b3 a4f3 a4cb a4c1 a4cf") //
+        << KEncodingProber::Universal << QByteArray("euc-jp");
 
     // From kde.org: "Explore the Internet with Plasma. Connect with colleagues, "
     //   "friends and family. Manage your files. Enjoy music and videos."
@@ -349,6 +372,28 @@ void KEncodingProberTest::testProbe_data()
         "f8eaeeebe0f52c20f3f0ffe4e0f520f2e020eef4b3f1e0f520efee20e2f1"
         "fceeecf320f1e2b3f2f32e0a") << //
         KEncodingProber::Universal << QByteArray("windows-1251");
+
+    // "<html><body>Это html файл и он имеет кодировку windows-1251/Latin1.</body></html>" --
+    // "<html><body>This is an HTML file and it uses the Windows-1251/Latin1 encoding.</html>"
+    QTest::addRow("KFileMetadata HTML Windows-1251") //
+        << QByteArray::fromHex( //
+               "3c68746d6c3e0a3c626f64793e0addf2ee2068746d6c20f4e0e9eb0ae820"
+               "eeed20e8ece5e5f220eaeee4e8f0eee2eaf32077696e646f77732d313235"
+               "312f4c6174696e312e0a3c2f626f64793e0a3c2f68746d6c3e0a")
+        << KEncodingProber::Universal << QByteArray("windows-1251");
+
+    constexpr char16_t plasmaZH_CNText[] =
+        u"KDE 软件为 NASA、CERN、奔驰电动汽车、Steam Deck、网络主播、"
+        "世界各地的学校、政府部门和企业办公室赋能。";
+    QTest::addRow("Plasma ZH-CN UTF-8") //
+        << QString(plasmaZH_CNText).toUtf8() //
+        << KEncodingProber::Universal << QByteArray("utf-8");
+    QTest::addRow("Plasma ZH-CN UTF-16LE") //
+        << QByteArray(asU16LEArray(plasmaZH_CNText)) //
+        << KEncodingProber::Universal << QByteArray("utf-16le");
+    QTest::addRow("Plasma ZH-CN UTF-16BE") //
+        << QByteArray(asU16BEArray(plasmaZH_CNText)) //
+        << KEncodingProber::Universal << QByteArray("utf-16be");
 }
 
 void KEncodingProberTest::benchmarkProber()

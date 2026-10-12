@@ -12,21 +12,17 @@
 
 #include <array>
 #include <memory>
-
-#define NUM_OF_CHARSET_PROBERS 3
+#include <span>
 
 namespace kencodingprober
 {
-typedef enum {
-    ePureAscii = 0,
-    eEscAscii = 1,
-    eHighbyte = 2,
-} nsInputState;
+class ProberState;
 
 class KCODECS_NO_EXPORT nsUniversalDetector : public nsCharSetProber
 {
 public:
-    nsUniversalDetector() = default;
+    nsUniversalDetector();
+    explicit nsUniversalDetector(std::span<const Prober> selected);
     ~nsUniversalDetector() override = default;
     nsProbingState HandleData(const char *aBuf, unsigned int aLen) override;
     const char *GetCharSetName() override;
@@ -36,14 +32,7 @@ public:
     std::string StatusOutput(uint8_t indent) override;
 
 protected:
-    nsInputState mInputState = ePureAscii;
-    bool mDone = false;
-    bool mGotData = false;
-    char mLastChar = '\0';
-    const char *mDetectedCharset = nullptr;
-
-    std::array<std::unique_ptr<nsCharSetProber>, NUM_OF_CHARSET_PROBERS> mCharSetProbers = {};
-    std::unique_ptr<nsCharSetProber> mEscCharSetProber;
+    std::unique_ptr<ProberState> mProberState;
 };
 }
 
